@@ -183,15 +183,11 @@
       <div class="row2">
         <div class="field">
           <label for="f-time">제한 시간 (초)</label>
-          <input id="f-time" type="number" value="15" min="3" max="120" inputmode="numeric">
+          <input id="f-time" type="number" value="15" inputmode="numeric">
         </div>
         <div class="field">
           <label for="f-count">문제 수</label>
-          <select id="f-count">
-            <option value="5">5문제</option><option value="10">10문제</option>
-            <option value="15">15문제</option><option value="20" selected>20문제</option>
-            <option value="25">25문제</option><option value="30">30문제</option>
-          </select>
+          <input id="f-count" type="number" value="20" inputmode="numeric">
         </div>
       </div>
       <div class="field" id="f-max-wrap">
@@ -234,7 +230,6 @@
       <div>
         <h2 class="sheet-title">채점지</h2>
         <p class="meta"><span class="k">이름</span><b id="r-name">—</b><span class="k">날짜</span><b id="r-date"></b></p>
-        <p class="range-note" id="r-range"></p>
       </div>
       <div class="score"><span class="big" id="r-score">0</span><span class="of"> / <span id="r-total">20</span></span></div>
     </div>
@@ -295,7 +290,6 @@
     syncTabs();
     $("f-max-wrap").style.display = settings.mode==="square" ? "" : "none";
   }
-  $("f-count").addEventListener("change", e=>{ settings.count = +e.target.value; syncSetupUI(); });
   $("f-max").addEventListener("change", e=>{ settings.maxN = +e.target.value; syncSetupUI(); });
 
   /* ── 문제 생성 ─────────────────────────── */
@@ -366,7 +360,11 @@
     t = Math.min(120, Math.max(3, t));
     $("f-time").value = t;
     settings.timeLimit = t;
-    settings.count = +$("f-count").value;
+    let c = parseInt($("f-count").value,10);
+    if (isNaN(c)) c = 20;
+    c = Math.min(100, Math.max(1, c));
+    $("f-count").value = c;
+    settings.count = c;
     settings.maxN = +$("f-max").value;
     startQuiz();
   });
@@ -483,9 +481,6 @@
     $("r-kicker").textContent = `${total}문제 완료`;
     $("r-name").textContent = settings.name || "—";
     $("r-date").textContent = koreanDate();
-    $("r-range").textContent = settings.mode==="square"
-      ? `11부터 ${settings.maxN}까지 · 10단위 수 제외`
-      : "11부터 19까지 · 두 수의 곱셈";
     $("r-score").textContent = score;
     $("r-total").textContent = total;
     const tb = $("r-table").querySelector("tbody");
@@ -498,7 +493,7 @@
       tb.appendChild(tr);
     });
     lastResult = { records:quiz.records.slice(), score, total,
-                   name:settings.name, date:koreanDate(), range:$("r-range").textContent };
+                   name:settings.name, date:koreanDate() };
     show("result");
   }
 
@@ -527,7 +522,6 @@
     const nw = c.measureText(r.name||"—").width;
     c.font = `700 13px ${F}`; c.fillStyle = "#6b7185"; c.fillText("날짜", pad+36+nw+28, 176);
     c.fillStyle = "#171a2b"; c.font = `800 20px ${F}`; c.fillText(r.date, pad+36+nw+28+36, 176);
-    c.fillStyle = "#6b7185"; c.font = `600 15px ${F}`; c.fillText(r.range, pad, 210);
     // 점수
     c.textAlign = "right";
     c.fillStyle = "#171a2b"; c.font = `800 96px ${F}`;
