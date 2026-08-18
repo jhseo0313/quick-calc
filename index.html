@@ -88,12 +88,6 @@
   .quiz-top{display:flex; align-items:center; justify-content:space-between; margin:0 0 10px;}
   .progress-label{font-size:14px; font-weight:700; color:var(--sub); letter-spacing:.06em;}
   .quiz-top .right{display:flex; align-items:center; gap:8px;}
-  .icon-btn{
-    appearance:none; cursor:pointer; font-size:15px; line-height:1;
-    width:38px; height:38px; border-radius:50%; border:1.5px solid var(--line); background:#fff; color:var(--ink);
-    display:grid; place-items:center; transition:all .15s;
-  }
-  .icon-btn.muted{color:#b6bac8; text-decoration:line-through;}
   .timer-pill{
     min-width:64px; text-align:center; background:#fff; border:1.5px solid var(--line); border-radius:999px;
     padding:8px 14px; font-weight:800; font-size:16px; font-variant-numeric:tabular-nums;
@@ -141,18 +135,15 @@
 
   /* ── 결과 화면 ─────────────────────────── */
   .sheet-head{display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-bottom:4px;}
-  .sheet-kicker{font-size:13px; font-weight:700; color:var(--sub); margin:0 0 6px;}
   h2.sheet-title{font-size:clamp(40px,9vw,64px); font-weight:800; letter-spacing:-.03em; margin:0 0 14px; line-height:1;}
   .meta{color:var(--ink); font-size:15px; margin:0 0 4px;}
   .meta b{margin-right:14px;}
   .meta .k{color:var(--sub); font-size:12.5px; font-weight:700; margin-right:6px;}
-  .range-note{color:var(--sub); font-size:13.5px; font-weight:600; margin:6px 0 0;}
   .score{text-align:right; line-height:.9;}
   .score .big{font-size:clamp(64px,14vw,104px); font-weight:800; letter-spacing:-.04em;}
   .score .of{color:var(--sub); font-size:22px; font-weight:700;}
   .rule{border:0; border-top:2px solid var(--ink); margin:18px 0 20px;}
   .result-actions{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
-  .capture-note{width:100%; color:var(--sub); font-size:12.5px; font-weight:500; margin-top:2px;}
   table.sheet{width:100%; border-collapse:collapse; margin-top:20px; background:#fff; border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow); border:1px solid var(--line);}
   table.sheet th{font-size:12.5px; color:var(--sub); font-weight:700; padding:14px 10px; border-bottom:1px solid var(--line); background:#fafbfe;}
   table.sheet td{text-align:center; padding:15px 10px; border-bottom:1px solid var(--line); font-weight:700; font-size:16.5px; font-variant-numeric:tabular-nums;}
@@ -209,7 +200,6 @@
     <div class="quiz-top">
       <span class="progress-label" id="q-progress">1 / 20</span>
       <div class="right">
-        <button type="button" class="icon-btn" id="snd-btn" title="소리 켜기/끄기">♪</button>
         <span class="timer-pill" id="timer-pill"><span id="timer-num">15</span><small>초</small></span>
       </div>
     </div>
@@ -225,7 +215,6 @@
 
   <!-- 결과 -->
   <section class="screen" id="scr-result">
-    <p class="sheet-kicker" id="r-kicker">20문제 완료</p>
     <div class="sheet-head">
       <div>
         <h2 class="sheet-title">채점지</h2>
@@ -237,7 +226,6 @@
     <div class="result-actions">
       <button type="button" class="btn btn-dark" id="btn-retry">다시 하기</button>
       <button type="button" class="btn btn-ghost" id="btn-capture">캡처하기</button>
-      <p class="capture-note">모바일은 공유 메뉴에서 이미지 저장 · Mac은 다운로드</p>
     </div>
     <table class="sheet" id="r-table">
       <thead><tr><th>문항</th><th>문제</th><th>내 답</th><th>정답</th><th>결과</th></tr></thead>
@@ -259,7 +247,7 @@
   const $ = id => document.getElementById(id);
 
   /* ── 상태 ─────────────────────────────── */
-  const settings = { mode:"square", name:"", timeLimit:15, count:20, maxN:100, muted:false };
+  const settings = { mode:"square", name:"", timeLimit:15, count:20, maxN:100 };
   let quiz = null;   // {questions, idx, records, deadline, rafId, tickId, waiting}
 
   const MODE_INFO = {
@@ -329,7 +317,6 @@
   /* ── 사운드 (WebAudio) ─────────────────── */
   let audioCtx = null;
   function beep(kind){
-    if (settings.muted) return;
     try{
       audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
       if (audioCtx.state==="suspended") audioCtx.resume();
@@ -338,18 +325,22 @@
         const o = audioCtx.createOscillator(), g = audioCtx.createGain();
         o.type = type; o.frequency.value = freq;
         g.gain.setValueAtTime(0.0001, t0);
-        g.gain.exponentialRampToValueAtTime(vol, t0+0.015);
+        g.gain.exponentialRampToValueAtTime(vol, t0+0.02);
         g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
         o.connect(g).connect(audioCtx.destination); o.start(t0); o.stop(t0+dur+0.05);
       };
-      if (kind==="good"){ mk(880,"sine",t,0.12,0.18); mk(1318.5,"sine",t+0.1,0.18,0.18); }
-      else { mk(196,"square",t,0.22,0.12); mk(147,"square",t+0.02,0.26,0.10); }
+      if (kind==="good"){
+        // 맑은 상승 아르페지오 차임
+        mk(784,   "triangle", t,      0.16, 0.16);
+        mk(1046.5,"triangle", t+0.07, 0.16, 0.16);
+        mk(1568,  "triangle", t+0.14, 0.24, 0.14);
+      } else {
+        // 부드럽게 내려가는 두 음
+        mk(330, "sine", t,      0.16, 0.16);
+        mk(262, "sine", t+0.14, 0.26, 0.15);
+      }
     }catch(e){/* 무음 환경 */}
   }
-  $("snd-btn").addEventListener("click", ()=>{
-    settings.muted = !settings.muted;
-    $("snd-btn").classList.toggle("muted", settings.muted);
-  });
 
   /* ── 퀴즈 진행 ─────────────────────────── */
   $("setup-form").addEventListener("submit", e=>{
@@ -478,7 +469,6 @@
   function showResult(){
     const total = quiz.records.length;
     const score = quiz.records.filter(r=>r.correct).length;
-    $("r-kicker").textContent = `${total}문제 완료`;
     $("r-name").textContent = settings.name || "—";
     $("r-date").textContent = koreanDate();
     $("r-score").textContent = score;
@@ -513,10 +503,8 @@
     // 배경
     c.fillStyle = "#f5f7fb"; c.fillRect(0,0,W,H);
     // 헤더
-    c.fillStyle = "#6b7185"; c.font = `700 15px ${F}`;
-    c.fillText(`${r.total}문제 완료`, pad, 64);
     c.fillStyle = "#171a2b"; c.font = `800 64px ${F}`;
-    c.fillText("채점지", pad, 132);
+    c.fillText("채점지", pad, 120);
     c.font = `700 13px ${F}`; c.fillStyle = "#6b7185"; c.fillText("이름", pad, 176);
     c.fillStyle = "#171a2b"; c.font = `800 20px ${F}`; c.fillText(r.name||"—", pad+36, 176);
     const nw = c.measureText(r.name||"—").width;
