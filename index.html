@@ -55,7 +55,7 @@
   .kicker{text-align:center; font-size:13px; font-weight:600; color:var(--sub); letter-spacing:.14em; margin:0 0 10px;}
   h1.title{
     text-align:center; font-size:clamp(38px,8vw,58px); font-weight:800; letter-spacing:-.03em;
-    margin:0 0 8px; line-height:1.05;
+    margin:0 0 28px; line-height:1.05;
   }
   h1.title em{font-style:normal; background:linear-gradient(100deg,var(--accent),#8a5bff); -webkit-background-clip:text; background-clip:text; color:transparent;}
   .mode-desc{text-align:center; color:var(--sub); font-size:14.5px; margin:0 0 30px; font-weight:500;}
@@ -174,9 +174,7 @@
 
   <!-- 설정 -->
   <section class="screen on" id="scr-setup">
-    <p class="kicker" id="setup-kicker">시간 설정 · 20문제</p>
     <h1 class="title">빠른 <em>계산</em> 연습</h1>
-    <p class="mode-desc" id="mode-desc"></p>
     <form class="setup card" id="setup-form" autocomplete="off">
       <div class="field">
         <label for="f-name">이름</label>
@@ -296,8 +294,6 @@
   function syncSetupUI(){
     syncTabs();
     $("f-max-wrap").style.display = settings.mode==="square" ? "" : "none";
-    $("mode-desc").textContent = MODE_INFO[settings.mode].desc(settings.maxN);
-    $("setup-kicker").textContent = `시간 설정 · ${settings.count}문제`;
   }
   $("f-count").addEventListener("change", e=>{ settings.count = +e.target.value; syncSetupUI(); });
   $("f-max").addEventListener("change", e=>{ settings.maxN = +e.target.value; syncSetupUI(); });
