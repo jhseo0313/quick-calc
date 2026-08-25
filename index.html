@@ -307,27 +307,34 @@
   function genQuestions(){
     const qs = [];
     if (settings.mode==="square"){
+      // 제곱수: 11~maxN(10단위 제외) — 각 수의 답이 모두 달라 수 자체를 중복 없이 뽑음
       const pool = [];
       for(let n=11;n<=settings.maxN;n++) if(n%10!==0) pool.push(n);
-      let bag = [];
-      for(let i=0;i<settings.count;i++){
-        if(!bag.length) bag = shuffle(pool.slice());
-        const n = bag.pop();
+      shuffle(pool);
+      const total = Math.min(settings.count, pool.length);
+      for(let i=0;i<total;i++){
+        const n = pool[i];
         qs.push({ display:String(n), label:`${n}²`, answer:n*n, parts:[String(n)] });
       }
     } else {
+      // 1n x 1n: 같은 답(곱)이 두 번 나오지 않도록 답 기준으로 중복 제거
+      const byProd = new Map();
+      for(let a=11;a<=19;a++) for(let b=11;b<=19;b++){
+        const p = a*b;
+        if(!byProd.has(p)) byProd.set(p, []);
+        byProd.get(p).push([a,b]);
+      }
       const over=[], under=[];
-      for(let a=11;a<=19;a++) for(let b=11;b<=19;b++) (a*b>200?over:under).push([a,b]);
-      let prevKey = "";
-      for(let i=0;i<settings.count;i++){
-        let pair, key, guard=0;
-        do{
-          const src = Math.random()<0.7 ? over : under;
-          pair = src[rand(src.length)];
-          key = pair[0]+"x"+pair[1];
-        }while(key===prevKey && guard++<20);
-        prevKey = key;
-        qs.push({ display:`${pair[0]} × ${pair[1]}`, label:`${pair[0]}×${pair[1]}`, answer:pair[0]*pair[1],
+      byProd.forEach((pairs,p)=>{ (p>200?over:under).push(p); });
+      shuffle(over); shuffle(under);
+      const total = Math.min(settings.count, over.length + under.length);
+      for(let i=0;i<total;i++){
+        let src = Math.random()<0.7 ? over : under;
+        if(!src.length) src = (src===over ? under : over);
+        const p = src.pop();
+        const cands = byProd.get(p);
+        const pair = cands[rand(cands.length)];
+        qs.push({ display:`${pair[0]} × ${pair[1]}`, label:`${pair[0]}×${pair[1]}`, answer:p,
                   parts:[String(pair[0]), String(pair[1])] });
       }
     }
