@@ -613,6 +613,8 @@
                    name:settings.name, date:koreanDate() };
     show("result");
     fitResult();
+    sheetBlob = null;
+    buildSheetImage(b => { sheetBlob = b; });   // 미리 만들어 두면 공유가 매끄러움
   }
 
   // 채점지가 한 화면을 넘으면 전체를 비율 축소해서 맞춤
@@ -641,9 +643,10 @@
   $("btn-retry").addEventListener("click", ()=>{ startQuiz(); });
 
   /* ── 캡처하기 (캔버스로 채점지 이미지 생성) ── */
-  let lastResult = null;
-  $("btn-capture").addEventListener("click", ()=>{
-    if (!lastResult) return;
+  let lastResult = null, sheetBlob = null;
+
+  function buildSheetImage(done){
+    if (!lastResult) return done(null);
     const r = lastResult;
     const F = '-apple-system,BlinkMacSystemFont,"Pretendard Variable",Pretendard,"Apple SD Gothic Neo","Noto Sans KR",sans-serif';
     const W = 900, pad = 48, cols = 5, gap = 12;
@@ -725,18 +728,42 @@
       c.fillText(String(rec.answer), dx, y+72);
     });
 
-    // 다운로드
+    cv.toBlob(done, "image/png");
+  }
+
+  function sheetFileName(){
     const d = new Date();
-    const dateSlug = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-    cv.toBlob(blob=>{
-      const a = document.createElement("a");
-      a.download = `채점지_${r.name||"기록"}_${dateSlug}.png`;
-      a.href = URL.createObjectURL(blob);
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
-    }, "image/png");
+    const slug = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    return `채점지_${(lastResult && lastResult.name) || "기록"}_${slug}.png`;
+  }
+
+  function downloadSheet(blob){
+    const a = document.createElement("a");
+    a.download = sheetFileName();
+    a.href = URL.createObjectURL(blob);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  }
+
+  // 폰·태블릿: 공유 시트 → "이미지 저장"으로 사진첩에 바로 저장
+  // 컴퓨터: 파일 다운로드
+  $("btn-capture").addEventListener("click", async ()=>{
+    if (!lastResult) return;
+    const blob = sheetBlob || await new Promise(res=>buildSheetImage(res));
+    if (!blob) return;
+    try{
+      const file = new File([blob], sheetFileName(), { type:"image/png" });
+      const touch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+      if (touch && navigator.canShare && navigator.canShare({ files:[file] })){
+        await navigator.share({ files:[file] });
+        return;
+      }
+    }catch(e){
+      if (e && e.name === "AbortError") return;   // 사용자가 공유를 취소함
+    }
+    downloadSheet(blob);
   });
 
   /* ── 초기화 ───────────────────────────── */
