@@ -37,12 +37,13 @@
 
   /* ── 모드 탭 ─────────────────────────── */
   .tabs{
-    display:flex; gap:4px; background:#e9ecf4; border-radius:999px; padding:4px;
-    width:max-content; margin:0 auto 26px; box-shadow:inset 0 1px 3px rgba(23,26,43,.06);
+    display:flex; flex-wrap:wrap; justify-content:center; gap:4px;
+    background:#e9ecf4; border-radius:22px; padding:4px;
+    width:max-content; max-width:100%; margin:0 auto 26px; box-shadow:inset 0 1px 3px rgba(23,26,43,.06);
   }
   .tabs button{
-    appearance:none; border:0; cursor:pointer; font:inherit;
-    padding:9px 26px; border-radius:999px; font-weight:700; font-size:14px;
+    appearance:none; border:0; cursor:pointer; font:inherit; white-space:nowrap;
+    padding:9px 18px; border-radius:999px; font-weight:700; font-size:14px;
     color:var(--sub); background:transparent; transition:all .18s ease; letter-spacing:.01em;
   }
   .tabs button.active{background:var(--ink); color:#fff; box-shadow:0 3px 10px rgba(23,26,43,.25);}
@@ -144,18 +145,18 @@
   .score .of{color:var(--sub); font-size:22px; font-weight:700;}
   .rule{border:0; border-top:2px solid var(--ink); margin:18px 0 20px;}
   .result-actions{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
-  .r-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; margin-top:16px;}
-  .cell{background:#fff; border:1px solid var(--line); border-radius:12px; padding:9px 12px 10px;}
+  .r-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:16px;}
+  .cell{background:#fff; border:1px solid var(--line); border-radius:12px; padding:8px 10px 9px; overflow:hidden;}
   .cell.ok{background:#f2faf7; border-color:#cfe9dd;}
   .cell.bad{background:#fdf3f3; border-color:#f2cfcf;}
-  .c-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;}
-  .c-num{font-size:11px; font-weight:700; color:var(--sub);}
-  .c-q{font-weight:800; font-size:17px; font-variant-numeric:tabular-nums;}
-  .c-a{font-size:13px; font-weight:600; color:var(--sub); margin-top:2px; font-variant-numeric:tabular-nums;}
+  .c-num{font-size:11px; font-weight:700; color:var(--sub); line-height:1;}
+  .c-mid{display:flex; align-items:center; justify-content:space-between; gap:5px; margin-top:3px;}
+  .c-q{font-weight:800; font-size:16px; letter-spacing:-.02em; white-space:nowrap; font-variant-numeric:tabular-nums;}
+  .c-a{font-size:12.5px; font-weight:600; color:var(--sub); margin-top:2px; font-variant-numeric:tabular-nums;}
   .c-a b{color:var(--ink); font-weight:800;}
   .c-a s{color:var(--bad); margin-right:4px;}
   .c-a .to{color:var(--bad); font-weight:600; margin-right:4px;}
-  .badge{display:inline-grid; place-items:center; width:22px; height:22px; border-radius:50%; font-weight:800; font-size:11.5px;}
+  .badge{flex:0 0 auto; display:inline-grid; place-items:center; width:20px; height:20px; border-radius:50%; font-weight:800; font-size:11px;}
   .badge.o{background:var(--ok-soft); color:var(--ok);}
   .badge.x{background:var(--bad-soft); color:var(--bad);}
 
@@ -170,11 +171,19 @@
     .rule{margin:10px 0 12px;}
     .result-actions{gap:8px;}
     .result-actions .btn{padding:9px 16px; font-size:13px; border-radius:10px;}
-    .r-grid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr)); gap:6px; margin-top:12px;}
-    .cell{padding:6px 8px 7px; border-radius:10px;}
-    .c-q{font-size:14px;}
-    .c-a{font-size:11.5px;}
-    .badge{width:18px; height:18px; font-size:10px;}
+    .tabs{gap:2px; padding:3px; margin-bottom:20px;}
+    .tabs button{padding:8px 9px; font-size:12px; letter-spacing:-.01em;}
+  }
+  @media (max-width:380px){
+    .tabs{gap:1px;}
+    .tabs button{padding:8px 6px; font-size:11px;}
+    .r-grid{gap:5px; margin-top:10px;}
+    .cell{padding:5px 5px 6px; border-radius:9px;}
+    .c-num{font-size:9px;}
+    .c-mid{gap:3px; margin-top:2px;}
+    .c-q{font-size:12.5px;}
+    .c-a{font-size:10.5px;}
+    .badge{width:15px; height:15px; font-size:9px;}
   }
 </style>
 </head>
@@ -184,6 +193,9 @@
   <div class="tabs" id="tabs">
     <button type="button" data-mode="square" class="active">제곱수</button>
     <button type="button" data-mode="mult">1n × 1n</button>
+    <button type="button" data-mode="md">2n × 1n</button>
+    <button type="button" data-mode="tens">12×18형</button>
+    <button type="button" data-mode="hund">28×72형</button>
   </div>
 
   <!-- 설정 -->
@@ -270,11 +282,6 @@
   const settings = { mode:"square", name:"", timeLimit:15, count:20, maxN:100 };
   let quiz = null;   // {questions, idx, records, deadline, rafId, tickId, waiting}
 
-  const MODE_INFO = {
-    square: { desc: m => `11부터 ${m}까지 · 10단위 수 제외`, prompt: "이 수를 제곱하면?" },
-    mult:   { desc: () => "11부터 19까지 두 수의 곱셈 · 정답 200 초과 약 70%", prompt: "두 수를 곱하면?" }
-  };
-
   /* ── 화면 전환 ─────────────────────────── */
   function show(name){
     ["setup","quiz","result"].forEach(s => $("scr-"+s).classList.toggle("on", s===name));
@@ -304,41 +311,67 @@
   const rand = n => Math.floor(Math.random()*n);
   function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=rand(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
+  // 모드별 후보 쌍 (곱셈 계열)
+  function candidatePairs(mode){
+    const pairs = [];
+    if (mode === "mult"){                 // 11~19 × 11~19
+      for(let a=11;a<=19;a++) for(let b=a;b<=19;b++) pairs.push([a,b]);
+    } else if (mode === "md"){            // 두 자리 × 한 자리
+      for(let a=11;a<=99;a++){
+        if(a%10===0) continue;
+        for(let b=2;b<=9;b++) pairs.push([a,b]);
+      }
+    } else if (mode === "tens"){          // 십의 자리 같고 일의 자리 합이 10
+      for(let t=1;t<=9;t++) for(let u=1;u<=5;u++) pairs.push([t*10+u, t*10+(10-u)]);
+    } else {                              // hund: 두 수를 더하면 100
+      for(let a=11;a<=49;a++){ if(a%10===0) continue; pairs.push([a, 100-a]); }
+    }
+    return pairs;
+  }
+
   function genQuestions(){
-    const qs = [];
-    if (settings.mode==="square"){
-      // 제곱수: 11~maxN(10단위 제외) — 각 수의 답이 모두 달라 수 자체를 중복 없이 뽑음
+    const mode = settings.mode;
+
+    // 제곱수: 수마다 답이 달라 수 자체를 중복 없이 뽑음
+    if (mode === "square"){
       const pool = [];
       for(let n=11;n<=settings.maxN;n++) if(n%10!==0) pool.push(n);
       shuffle(pool);
-      const total = Math.min(settings.count, pool.length);
-      for(let i=0;i<total;i++){
-        const n = pool[i];
-        qs.push({ display:String(n), label:`${n}²`, answer:n*n, parts:[String(n)] });
-      }
-    } else {
-      // 1n x 1n: 같은 답(곱)이 두 번 나오지 않도록 답 기준으로 중복 제거
-      const byProd = new Map();
-      for(let a=11;a<=19;a++) for(let b=11;b<=19;b++){
-        const p = a*b;
-        if(!byProd.has(p)) byProd.set(p, []);
-        byProd.get(p).push([a,b]);
-      }
-      const over=[], under=[];
-      byProd.forEach((pairs,p)=>{ (p>200?over:under).push(p); });
+      return pool.slice(0, Math.min(settings.count, pool.length))
+                 .map(n => ({ label:`${n}²`, answer:n*n, parts:[String(n)] }));
+    }
+
+    // 곱셈 계열: 답(곱)이 같은 문제가 한 판에 두 번 나오지 않도록 답 기준으로 묶음
+    const byProd = new Map();
+    candidatePairs(mode).forEach(pr=>{
+      const p = pr[0]*pr[1];
+      if(!byProd.has(p)) byProd.set(p, []);
+      byProd.get(p).push(pr);
+    });
+
+    const keys = Array.from(byProd.keys());
+    const total = Math.min(settings.count, keys.length);
+    const chosen = [];
+    if (mode === "mult"){                 // 정답 200 초과 약 70%
+      const over = keys.filter(p=>p>200), under = keys.filter(p=>p<=200);
       shuffle(over); shuffle(under);
-      const total = Math.min(settings.count, over.length + under.length);
       for(let i=0;i<total;i++){
         let src = Math.random()<0.7 ? over : under;
         if(!src.length) src = (src===over ? under : over);
-        const p = src.pop();
-        const cands = byProd.get(p);
-        const pair = cands[rand(cands.length)];
-        qs.push({ display:`${pair[0]} × ${pair[1]}`, label:`${pair[0]}×${pair[1]}`, answer:p,
-                  parts:[String(pair[0]), String(pair[1])] });
+        chosen.push(src.pop());
       }
+    } else {
+      shuffle(keys);
+      for(let i=0;i<total;i++) chosen.push(keys[i]);
     }
-    return qs;
+
+    return chosen.map(p=>{
+      const cands = byProd.get(p);
+      const pick = cands[rand(cands.length)];
+      let a = pick[0], b = pick[1];
+      if (mode !== "md" && Math.random()<0.5){ const t=a; a=b; b=t; }  // 앞뒤 순서 섞기
+      return { label:`${a}×${b}`, answer:p, parts:[String(a), String(b)] };
+    });
   }
 
   /* ── 사운드 (WebAudio) ─────────────────── */
@@ -401,7 +434,7 @@
   function nextQuestion(first){
     const q = quiz.questions[quiz.idx];
     $("q-progress").textContent = `${quiz.idx+1} / ${quiz.questions.length}`;
-    $("q-prompt").textContent = MODE_INFO[settings.mode].prompt;
+    $("q-prompt").textContent = settings.mode==="square" ? "이 수를 제곱하면?" : "두 수를 곱하면?";
     if (q.parts.length===2){
       $("q-text").innerHTML = `${q.parts[0]}<span class="op">×</span>${q.parts[1]}`;
     } else {
@@ -507,11 +540,11 @@
       cell.className = "cell " + (r.correct ? "ok" : "bad");
       let ans;
       if (r.correct)        ans = `<b>${r.answer}</b>`;
-      else if (r.timedOut)  ans = `<span class="to">시간 초과</span><b>${r.answer}</b>`;
+      else if (r.timedOut)  ans = `<span class="to">시간초과</span><b>${r.answer}</b>`;
       else                  ans = `<s>${r.userAns}</s><b>${r.answer}</b>`;
-      cell.innerHTML = `<div class="c-top"><span class="c-num">${i+1}</span>
+      cell.innerHTML = `<div class="c-num">${i+1}</div>
+                        <div class="c-mid"><span class="c-q">${r.label}</span>
                         <span class="badge ${r.correct?"o":"x"}">${r.correct?"O":"X"}</span></div>
-                        <div class="c-q">${r.label}</div>
                         <div class="c-a">${ans}</div>`;
       grid.appendChild(cell);
     });
@@ -551,55 +584,86 @@
   $("btn-capture").addEventListener("click", ()=>{
     if (!lastResult) return;
     const r = lastResult;
-    const W = 900, rowH = 64, headH = 320, pad = 56;
-    const H = headH + 58 + r.records.length*rowH + pad;
+    const F = '-apple-system,BlinkMacSystemFont,"Pretendard Variable",Pretendard,"Apple SD Gothic Neo","Noto Sans KR",sans-serif';
+    const W = 900, pad = 48, cols = 5, gap = 12;
+    const cw = (W - pad*2 - gap*(cols-1)) / cols;
+    const ch = 84, headH = 250;
+    const rows = Math.ceil(r.records.length / cols);
+    const H = headH + rows*(ch+gap) + pad - gap;
+
     const cv = document.createElement("canvas");
     const scale = 2; cv.width = W*scale; cv.height = H*scale;
     const c = cv.getContext("2d"); c.scale(scale,scale);
-    const F = '-apple-system,BlinkMacSystemFont,"Pretendard Variable",Pretendard,"Apple SD Gothic Neo","Noto Sans KR",sans-serif';
+
+    const roundRect = (x,y,w,h,rd)=>{
+      c.beginPath();
+      c.moveTo(x+rd,y);
+      c.arcTo(x+w,y,x+w,y+h,rd); c.arcTo(x+w,y+h,x,y+h,rd);
+      c.arcTo(x,y+h,x,y,rd);     c.arcTo(x,y,x+w,y,rd);
+      c.closePath();
+    };
+
     // 배경
     c.fillStyle = "#f5f7fb"; c.fillRect(0,0,W,H);
+
     // 헤더
-    c.fillStyle = "#171a2b"; c.font = `800 64px ${F}`;
-    c.fillText("채점지", pad, 120);
-    c.font = `700 13px ${F}`; c.fillStyle = "#6b7185"; c.fillText("이름", pad, 176);
-    c.fillStyle = "#171a2b"; c.font = `800 20px ${F}`; c.fillText(r.name||"—", pad+36, 176);
+    c.fillStyle = "#171a2b"; c.font = `800 60px ${F}`;
+    c.fillText("채점지", pad, 108);
+    c.font = `700 13px ${F}`; c.fillStyle = "#6b7185"; c.fillText("이름", pad, 156);
+    c.fillStyle = "#171a2b"; c.font = `800 20px ${F}`; c.fillText(r.name||"—", pad+36, 156);
     const nw = c.measureText(r.name||"—").width;
-    c.font = `700 13px ${F}`; c.fillStyle = "#6b7185"; c.fillText("날짜", pad+36+nw+28, 176);
-    c.fillStyle = "#171a2b"; c.font = `800 20px ${F}`; c.fillText(r.date, pad+36+nw+28+36, 176);
+    c.font = `700 13px ${F}`; c.fillStyle = "#6b7185"; c.fillText("날짜", pad+36+nw+28, 156);
+    c.fillStyle = "#171a2b"; c.font = `800 20px ${F}`; c.fillText(r.date, pad+36+nw+28+36, 156);
+
     // 점수
     c.textAlign = "right";
-    c.fillStyle = "#171a2b"; c.font = `800 96px ${F}`;
     const ofTxt = ` / ${r.total}`;
     c.font = `700 26px ${F}`; const ofW = c.measureText(ofTxt).width;
-    c.font = `800 96px ${F}`; c.fillText(String(r.score), W-pad-ofW, 190);
-    c.fillStyle = "#6b7185"; c.font = `700 26px ${F}`; c.fillText(ofTxt, W-pad, 190);
+    c.fillStyle = "#171a2b"; c.font = `800 92px ${F}`; c.fillText(String(r.score), W-pad-ofW, 170);
+    c.fillStyle = "#6b7185"; c.font = `700 26px ${F}`; c.fillText(ofTxt, W-pad, 170);
     c.textAlign = "left";
+
     // 구분선
     c.strokeStyle = "#171a2b"; c.lineWidth = 2.5;
-    c.beginPath(); c.moveTo(pad, 240); c.lineTo(W-pad, 240); c.stroke();
-    // 표
-    const cols = [pad+30, 250, 460, 640, W-pad-60];
-    const heads = ["문항","문제","내 답","정답","결과"];
-    c.font = `700 13px ${F}`; c.fillStyle = "#6b7185"; c.textAlign="center";
-    heads.forEach((h,i)=>c.fillText(h, cols[i], headH-14));
-    c.strokeStyle = "#e5e8f0"; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(pad, 196); c.lineTo(W-pad, 196); c.stroke();
+
+    // 문항 카드 (가로 5칸)
     r.records.forEach((rec,i)=>{
-      const y = headH + 20 + i*rowH;
-      c.beginPath(); c.moveTo(pad, y-32); c.lineTo(W-pad, y-32); c.stroke();
-      c.fillStyle = "#171a2b"; c.font = `700 18px ${F}`;
-      c.fillText(String(i+1), cols[0], y);
-      c.font = `800 20px ${F}`; c.fillText(rec.label, cols[1], y);
-      if (rec.timedOut){ c.fillStyle="#6b7185"; c.font = `600 15px ${F}`; c.fillText("시간 초과", cols[2], y); }
-      else { c.font = `700 18px ${F}`; c.fillText(String(rec.userAns), cols[2], y); }
-      c.fillStyle = "#171a2b"; c.font = `700 18px ${F}`; c.fillText(String(rec.answer), cols[3], y);
+      const x = pad + (i%cols)*(cw+gap);
+      const y = headH + Math.floor(i/cols)*(ch+gap);
+      roundRect(x, y, cw, ch, 12);
+      c.fillStyle = rec.correct ? "#f2faf7" : "#fdf3f3"; c.fill();
+      c.strokeStyle = rec.correct ? "#cfe9dd" : "#f2cfcf"; c.lineWidth = 1.2; c.stroke();
+
+      c.fillStyle = "#6b7185"; c.font = `700 12px ${F}`;
+      c.fillText(String(i+1), x+12, y+22);
+
+      c.fillStyle = "#171a2b"; c.font = `800 21px ${F}`;
+      c.fillText(rec.label, x+12, y+50);
+
       // O/X 배지
-      c.beginPath(); c.arc(cols[4], y-6, 16, 0, Math.PI*2);
+      c.beginPath(); c.arc(x+cw-24, y+42, 12, 0, Math.PI*2);
       c.fillStyle = rec.correct ? "#e5f6ef" : "#fdecec"; c.fill();
-      c.fillStyle = rec.correct ? "#0f9d6e" : "#e04444"; c.font = `800 16px ${F}`;
-      c.fillText(rec.correct?"O":"X", cols[4], y);
+      c.fillStyle = rec.correct ? "#0f9d6e" : "#e04444"; c.font = `800 13px ${F}`;
+      c.textAlign = "center"; c.fillText(rec.correct?"O":"X", x+cw-24, y+47); c.textAlign = "left";
+
+      // 답
+      let dx = x+12;
+      if (!rec.correct){
+        const wrong = rec.timedOut ? "시간초과" : String(rec.userAns);
+        c.fillStyle = "#e04444"; c.font = `600 13px ${F}`;
+        c.fillText(wrong, dx, y+72);
+        const ww = c.measureText(wrong).width;
+        if (!rec.timedOut){                       // 내가 쓴 답에 취소선
+          c.strokeStyle = "#e04444"; c.lineWidth = 1.2;
+          c.beginPath(); c.moveTo(dx, y+68); c.lineTo(dx+ww, y+68); c.stroke();
+        }
+        dx += ww + 6;
+      }
+      c.fillStyle = "#171a2b"; c.font = `800 15px ${F}`;
+      c.fillText(String(rec.answer), dx, y+72);
     });
-    c.textAlign = "left";
+
     // 다운로드
     const d = new Date();
     const dateSlug = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
