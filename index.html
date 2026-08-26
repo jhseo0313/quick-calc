@@ -329,48 +329,109 @@
     return pairs;
   }
 
+  // 후보를 구간별로 나눠 한쪽에 몰리지 않게 고르게 뽑음
+  // keyFn: 주 구간(예: 십의 자리)  subKeyFn: 보조 구간(예: 곱하는 한 자리 수)
+  function pickSpread(items, total, keyFn, subKeyFn){
+    const groups = new Map();
+    items.forEach(it=>{
+      const k = keyFn(it);
+      if(!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(it);
+    });
+    groups.forEach(g=>shuffle(g));
+    const order = shuffle(Array.from(groups.keys()));
+    const subUse = new Map();
+    const out = [];
+    while(out.length < total){
+      let moved = false;
+      for(const k of order){
+        if(out.length >= total) break;
+        const g = groups.get(k);
+        if(!g.length) continue;
+        let idx = 0;
+        if (subKeyFn){                    // 보조 구간이 가장 덜 나온 후보 먼저
+          let best = Infinity;
+          for(let i=0;i<g.length;i++){
+            const u = subUse.get(subKeyFn(g[i])) || 0;
+            if(u < best){ best = u; idx = i; }
+          }
+        }
+        const it = g.splice(idx,1)[0];
+        if (subKeyFn) subUse.set(subKeyFn(it), (subUse.get(subKeyFn(it))||0) + 1);
+        out.push(it);
+        moved = true;
+      }
+      if(!moved) break;                   // 남은 후보 없음
+    }
+    return shuffle(out);
+  }
+
+  // 두 숫자가 고르게 등장하도록 덜 쓰인 수부터 뽑음
+  function pickBalanced(items, total){
+    const pool = shuffle(items.slice()), use = new Map(), out = [];
+    while(out.length < total && pool.length){
+      let best = Infinity, idx = 0;
+      for(let i=0;i<pool.length;i++){
+        const c = (use.get(pool[i].a)||0) + (use.get(pool[i].b)||0);
+        if(c < best){ best = c; idx = i; }
+      }
+      const x = pool.splice(idx,1)[0];
+      use.set(x.a,(use.get(x.a)||0)+1);
+      use.set(x.b,(use.get(x.b)||0)+1);
+      out.push(x);
+    }
+    return out;
+  }
+
   function genQuestions(){
     const mode = settings.mode;
 
-    // 제곱수: 수마다 답이 달라 수 자체를 중복 없이 뽑음
+    // 제곱수: 십의 자리 구간별로 고르게
     if (mode === "square"){
       const pool = [];
       for(let n=11;n<=settings.maxN;n++) if(n%10!==0) pool.push(n);
-      shuffle(pool);
-      return pool.slice(0, Math.min(settings.count, pool.length))
-                 .map(n => ({ label:`${n}²`, answer:n*n, parts:[String(n)] }));
+      const total = Math.min(settings.count, pool.length);
+      return pickSpread(pool, total, n=>Math.floor(n/10))
+             .map(n => ({ label:`${n}²`, answer:n*n, parts:[String(n)] }));
     }
 
-    // 곱셈 계열: 답(곱)이 같은 문제가 한 판에 두 번 나오지 않도록 답 기준으로 묶음
+    // 곱셈 계열: 답(곱)이 같은 문제는 한 판에 하나만 (곱마다 대표 문제 하나)
     const byProd = new Map();
     candidatePairs(mode).forEach(pr=>{
       const p = pr[0]*pr[1];
       if(!byProd.has(p)) byProd.set(p, []);
       byProd.get(p).push(pr);
     });
+    const uniq = [];
+    byProd.forEach(cands=>{
+      const pk = cands[rand(cands.length)];
+      uniq.push({ a:pk[0], b:pk[1], p:pk[0]*pk[1] });
+    });
 
-    const keys = Array.from(byProd.keys());
-    const total = Math.min(settings.count, keys.length);
-    const chosen = [];
-    if (mode === "mult"){                 // 정답 200 초과 약 70%
-      const over = keys.filter(p=>p>200), under = keys.filter(p=>p<=200);
-      shuffle(over); shuffle(under);
-      for(let i=0;i<total;i++){
-        let src = Math.random()<0.7 ? over : under;
-        if(!src.length) src = (src===over ? under : over);
-        chosen.push(src.pop());
-      }
-    } else {
-      shuffle(keys);
-      for(let i=0;i<total;i++) chosen.push(keys[i]);
+    let chosen;
+    if (mode === "mult"){                 // 정답 200 초과 약 70%, 각각 구간별로 고르게
+      const over = uniq.filter(x=>x.p>200), under = uniq.filter(x=>x.p<=200);
+      const total = Math.min(settings.count, uniq.length);
+      let nOver = Math.min(over.length, Math.round(total*0.7));
+      let nUnder = Math.min(under.length, total - nOver);
+      nOver = Math.min(over.length, total - nUnder);
+      chosen = pickBalanced(over, nOver).concat(pickBalanced(under, nUnder));
+      shuffle(chosen);
+    } else if (mode === "md"){            // 두 자리 수의 십의 자리 + 한 자리 수 모두 고르게
+      chosen = pickSpread(uniq, Math.min(settings.count, uniq.length),
+                          x=>Math.floor(Math.max(x.a,x.b)/10),
+                          x=>Math.min(x.a,x.b));
+    } else if (mode === "tens"){          // 십의 자리 구간별로 고르게
+      chosen = pickSpread(uniq, Math.min(settings.count, uniq.length), x=>Math.floor(x.a/10));
+    } else {                              // hund: 작은 수의 십의 자리 구간별로 고르게
+      chosen = pickSpread(uniq, Math.min(settings.count, uniq.length),
+                          x=>Math.floor(Math.min(x.a,x.b)/10));
     }
 
-    return chosen.map(p=>{
-      const cands = byProd.get(p);
-      const pick = cands[rand(cands.length)];
-      let a = pick[0], b = pick[1];
+    return chosen.map(x=>{
+      let a = x.a, b = x.b;
       if (mode !== "md" && Math.random()<0.5){ const t=a; a=b; b=t; }  // 앞뒤 순서 섞기
-      return { label:`${a}×${b}`, answer:p, parts:[String(a), String(b)] };
+      return { label:`${a}×${b}`, answer:x.p, parts:[String(a), String(b)] };
     });
   }
 
