@@ -71,6 +71,11 @@
   }
   .field input:focus,.field select:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(79,93,255,.14);}
   .row2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .range-row{display:flex; align-items:center; gap:10px;}
+  .range-row select{flex:1; min-width:0;}
+  .range-sep{color:var(--sub); font-weight:800; font-size:18px;}
+  .ans-sup{display:none; align-self:flex-start; font-size:40px; font-weight:800; line-height:1; margin:0 0 0 -4px;}
+  .ans-sup.on{display:block;}
   @media (max-width:430px){.row2{grid-template-columns:1fr;}}
   .btn{
     appearance:none; border:0; cursor:pointer; font:inherit; font-weight:800; letter-spacing:.02em;
@@ -171,12 +176,8 @@
     .rule{margin:10px 0 12px;}
     .result-actions{gap:8px;}
     .result-actions .btn{padding:9px 16px; font-size:13px; border-radius:10px;}
-    .tabs{gap:2px; padding:3px; margin-bottom:20px;}
-    .tabs button{padding:8px 9px; font-size:12px; letter-spacing:-.01em;}
-  }
-  @media (max-width:380px){
-    .tabs{gap:1px;}
-    .tabs button{padding:8px 6px; font-size:11px;}
+    .tabs{display:grid; grid-template-columns:repeat(4,1fr); width:100%; gap:2px; padding:3px; margin-bottom:20px; border-radius:16px;}
+    .tabs button{padding:8px 4px; font-size:12px; letter-spacing:-.01em;}
     .r-grid{gap:5px; margin-top:10px;}
     .cell{padding:5px 5px 6px; border-radius:9px;}
     .c-num{font-size:9px;}
@@ -185,6 +186,9 @@
     .c-a{font-size:10.5px;}
     .badge{width:15px; height:15px; font-size:9px;}
   }
+  @media (max-width:380px){
+    .tabs button{padding:8px 2px; font-size:11px;}
+  }
 </style>
 </head>
 <body>
@@ -192,9 +196,11 @@
 
   <div class="tabs" id="tabs">
     <button type="button" data-mode="square" class="active">제곱수</button>
+    <button type="button" data-mode="sqrt">제곱근</button>
     <button type="button" data-mode="mult">19단</button>
     <button type="button" data-mode="md">nn × n</button>
     <button type="button" data-mode="tens">same10</button>
+    <button type="button" data-mode="tenf">10F곱</button>
     <button type="button" data-mode="hund">100F곱</button>
   </div>
 
@@ -216,15 +222,21 @@
           <input id="f-count" type="number" value="20" inputmode="numeric">
         </div>
       </div>
-      <div class="field" id="f-max-wrap">
-        <label for="f-max">최대 출제 수</label>
-        <select id="f-max">
-          <option value="20">20까지</option><option value="30">30까지</option>
-          <option value="40">40까지</option><option value="50">50까지</option>
-          <option value="60">60까지</option><option value="70">70까지</option>
-          <option value="80">80까지</option><option value="90">90까지</option>
-          <option value="100" selected>100까지</option>
-        </select>
+      <div class="field" id="f-range-wrap">
+        <label for="f-rmin">출제 범위</label>
+        <div class="range-row">
+          <select id="f-rmin">
+            <option value="10" selected>10</option><option value="20">20</option><option value="30">30</option>
+            <option value="40">40</option><option value="50">50</option><option value="60">60</option>
+            <option value="70">70</option><option value="80">80</option><option value="90">90</option>
+          </select>
+          <span class="range-sep">~</span>
+          <select id="f-rmax">
+            <option value="20">20</option><option value="30">30</option><option value="40">40</option>
+            <option value="50">50</option><option value="60">60</option><option value="70">70</option>
+            <option value="80">80</option><option value="90">90</option><option value="100" selected>100</option>
+          </select>
+        </div>
       </div>
       <button class="btn btn-primary" type="submit">시작하기</button>
     </form>
@@ -243,6 +255,7 @@
     <div class="question" id="q-text">55</div>
     <form class="answer-row" id="answer-form" autocomplete="off">
       <input id="f-answer" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="정답">
+      <span class="ans-sup" id="ans-sup">²</span>
       <button class="btn btn-dark" type="submit">확인</button>
     </form>
     <p class="input-msg" id="input-msg">숫자를 입력해 주세요.</p>
@@ -279,7 +292,8 @@
   const $ = id => document.getElementById(id);
 
   /* ── 상태 ─────────────────────────────── */
-  const settings = { mode:"square", name:"", timeLimit:15, count:20, maxN:100 };
+  const settings = { mode:"square", name:"", timeLimit:15, count:20, rmin:10, rmax:100 };
+  const RANGE_MODES = ["square", "sqrt"];     // 출제 범위를 쓰는 모드
   let quiz = null;   // {questions, idx, records, deadline, rafId, tickId, waiting}
 
   /* ── 화면 전환 ─────────────────────────── */
@@ -303,9 +317,20 @@
   }
   function syncSetupUI(){
     syncTabs();
-    $("f-max-wrap").style.display = settings.mode==="square" ? "" : "none";
+    $("f-range-wrap").style.display = RANGE_MODES.includes(settings.mode) ? "" : "none";
   }
-  $("f-max").addEventListener("change", e=>{ settings.maxN = +e.target.value; syncSetupUI(); });
+  // 출제 범위: 시작이 끝보다 같거나 크면 반대쪽을 자동으로 맞춤
+  function syncRange(changed){
+    let lo = +$("f-rmin").value, hi = +$("f-rmax").value;
+    if (lo >= hi){
+      if (changed === "min") hi = Math.min(100, lo + 10);
+      else lo = Math.max(10, hi - 10);
+      $("f-rmin").value = lo; $("f-rmax").value = hi;
+    }
+    settings.rmin = lo; settings.rmax = hi;
+  }
+  $("f-rmin").addEventListener("change", ()=>syncRange("min"));
+  $("f-rmax").addEventListener("change", ()=>syncRange("max"));
 
   /* ── 문제 생성 ─────────────────────────── */
   const rand = n => Math.floor(Math.random()*n);
@@ -323,6 +348,11 @@
       }
     } else if (mode === "tens"){          // 십의 자리 같고 일의 자리 합이 10
       for(let t=1;t<=9;t++) for(let u=1;u<=5;u++) pairs.push([t*10+u, t*10+(10-u)]);
+    } else if (mode === "tenf"){          // 일의 자리 합이 10 (합이 몇십), same10·100F곱과 겹치는 건 제외
+      for(let ta=1;ta<=9;ta++) for(let tb=ta+1;tb<=9;tb++){
+        if (ta + tb === 9) continue;        // 합이 100 → 100F곱
+        for(let u=1;u<=9;u++) pairs.push([ta*10+u, tb*10+(10-u)]);
+      }
     } else {                              // hund: 두 수를 더하면 100
       for(let a=11;a<=49;a++){ if(a%10===0) continue; pairs.push([a, 100-a]); }
     }
@@ -386,13 +416,15 @@
   function genQuestions(){
     const mode = settings.mode;
 
-    // 제곱수: 십의 자리 구간별로 고르게
-    if (mode === "square"){
+    // 제곱수·제곱근: 설정한 범위 안에서 십의 자리 구간별로 고르게
+    if (RANGE_MODES.includes(mode)){
       const pool = [];
-      for(let n=11;n<=settings.maxN;n++) if(n%10!==0) pool.push(n);
+      for(let n=settings.rmin+1;n<settings.rmax;n++) if(n%10!==0) pool.push(n);
       const total = Math.min(settings.count, pool.length);
-      return pickSpread(pool, total, n=>Math.floor(n/10))
-             .map(n => ({ label:`${n}²`, answer:n*n, parts:[String(n)] }));
+      const picked = pickSpread(pool, total, n=>Math.floor(n/10));
+      if (mode === "sqrt")                // 1296 → 답 36 (36²)
+        return picked.map(n => ({ label:String(n*n), answer:n, unit:"²", parts:[String(n*n)] }));
+      return picked.map(n => ({ label:`${n}²`, answer:n*n, unit:"", parts:[String(n)] }));
     }
 
     // 곱셈 계열: 답(곱)이 같은 문제는 한 판에 하나만 (곱마다 대표 문제 하나)
@@ -423,6 +455,10 @@
                           x=>Math.min(x.a,x.b));
     } else if (mode === "tens"){          // 십의 자리 구간별로 고르게
       chosen = pickSpread(uniq, Math.min(settings.count, uniq.length), x=>Math.floor(x.a/10));
+    } else if (mode === "tenf"){          // 두 수의 합(40~190) 구간별 + 일의 자리 조합 고르게
+      chosen = pickSpread(uniq, Math.min(settings.count, uniq.length),
+                          x=>x.a+x.b,
+                          x=>Math.min(x.a%10, x.b%10));
     } else {                              // hund: 작은 수의 십의 자리 구간별로 고르게
       chosen = pickSpread(uniq, Math.min(settings.count, uniq.length),
                           x=>Math.floor(Math.min(x.a,x.b)/10));
@@ -431,7 +467,7 @@
     return chosen.map(x=>{
       let a = x.a, b = x.b;
       if (mode !== "md" && Math.random()<0.5){ const t=a; a=b; b=t; }  // 앞뒤 순서 섞기
-      return { label:`${a}×${b}`, answer:x.p, parts:[String(a), String(b)] };
+      return { label:`${a}×${b}`, answer:x.p, unit:"", parts:[String(a), String(b)] };
     });
   }
 
@@ -477,7 +513,7 @@
     c = Math.min(100, Math.max(1, c));
     $("f-count").value = c;
     settings.count = c;
-    settings.maxN = +$("f-max").value;
+    syncRange("min");
     startQuiz();
   });
 
@@ -495,7 +531,10 @@
   function nextQuestion(first){
     const q = quiz.questions[quiz.idx];
     $("q-progress").textContent = `${quiz.idx+1} / ${quiz.questions.length}`;
-    $("q-prompt").textContent = settings.mode==="square" ? "이 수를 제곱하면?" : "두 수를 곱하면?";
+    $("q-prompt").textContent = settings.mode==="square" ? "이 수를 제곱하면?"
+                              : settings.mode==="sqrt"   ? "몇의 제곱일까요?"
+                              : "두 수를 곱하면?";
+    $("ans-sup").classList.toggle("on", settings.mode==="sqrt");
     if (q.parts.length===2){
       $("q-text").innerHTML = `${q.parts[0]}<span class="op">×</span>${q.parts[1]}`;
     } else {
@@ -559,9 +598,9 @@
     quiz.waiting = true;
     const q = quiz.questions[quiz.idx];
     const correct = !timedOut && userAns===q.answer;
-    quiz.records.push({ label:q.label, userAns, timedOut, answer:q.answer, correct });
+    quiz.records.push({ label:q.label, userAns, timedOut, answer:q.answer, unit:q.unit||"", correct });
     beep(correct ? "good" : "bad");
-    showOverlay(correct, q.answer, timedOut);
+    showOverlay(correct, q.answer + (q.unit||""), timedOut);
     setTimeout(()=>{
       hideOverlay();
       if (!quiz) return;             // 도중에 탭으로 이탈한 경우
@@ -600,9 +639,9 @@
       const cell = document.createElement("div");
       cell.className = "cell " + (r.correct ? "ok" : "bad");
       let ans;
-      if (r.correct)        ans = `<b>${r.answer}</b>`;
-      else if (r.timedOut)  ans = `<span class="to">시간초과</span><b>${r.answer}</b>`;
-      else                  ans = `<s>${r.userAns}</s><b>${r.answer}</b>`;
+      if (r.correct)        ans = `<b>${r.answer}${r.unit}</b>`;
+      else if (r.timedOut)  ans = `<span class="to">시간초과</span><b>${r.answer}${r.unit}</b>`;
+      else                  ans = `<s>${r.userAns}${r.unit}</s><b>${r.answer}${r.unit}</b>`;
       cell.innerHTML = `<div class="c-num">${i+1}</div>
                         <div class="c-mid"><span class="c-q">${r.label}</span>
                         <span class="badge ${r.correct?"o":"x"}">${r.correct?"O":"X"}</span></div>
@@ -714,7 +753,7 @@
       // 답
       let dx = x+12;
       if (!rec.correct){
-        const wrong = rec.timedOut ? "시간초과" : String(rec.userAns);
+        const wrong = rec.timedOut ? "시간초과" : String(rec.userAns) + rec.unit;
         c.fillStyle = "#e04444"; c.font = `600 13px ${F}`;
         c.fillText(wrong, dx, y+72);
         const ww = c.measureText(wrong).width;
@@ -725,7 +764,7 @@
         dx += ww + 6;
       }
       c.fillStyle = "#171a2b"; c.font = `800 15px ${F}`;
-      c.fillText(String(rec.answer), dx, y+72);
+      c.fillText(String(rec.answer) + rec.unit, dx, y+72);
     });
 
     cv.toBlob(done, "image/png");
